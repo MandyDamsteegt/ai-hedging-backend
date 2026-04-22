@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 const DATA_DIR = path.join(__dirname, "data");
 if (!fs.existsSync(DATA_DIR)) {
@@ -21,23 +21,30 @@ function safeParticipantId(value) {
   return String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
-function loadAllJsonFiles() {
-  const files = fs
+function getJsonFiles() {
+  return fs
     .readdirSync(DATA_DIR)
     .filter((file) => file.toLowerCase().endsWith(".json"));
-
-  return files.map((file) => {
-    const filePath = path.join(DATA_DIR, file);
-    const content = fs.readFileSync(filePath, "utf8");
-    return {
-      file,
-      parsed: JSON.parse(content),
-    };
-  });
 }
 
-function toCsv(rows) {
-  if (!rows.length) return "";
+function readJsonFile(fileName) {
+  const filePath = path.join(DATA_DIR, fileName);
+  const raw = fs.readFileSync(filePath, "utf8");
+  return JSON.parse(raw);
+}
+
+function csvEscape(value) {
+  const stringValue = value == null ? "" : String(value);
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function rowsToCsv(rows) {
+  if (!rows.length) {
+    return "participant_id,condition,condition_label\n";
+  }
 
   const headers = Array.from(
     rows.reduce((set, row) => {
@@ -46,20 +53,12 @@ function toCsv(rows) {
     }, new Set())
   );
 
-  const escapeCell = (value) => {
-    const stringValue = value == null ? "" : String(value);
-    if (/[",\n]/.test(stringValue)) {
-      return `"${stringValue.replace(/"/g, '""')}"`;
-    }
-    return stringValue;
-  };
-
-  return [
+  const lines = [
     headers.join(","),
-    ...rows.map((row) =>
-      headers.map((header) => escapeCell(row[header])).join(",")
-    ),
-  ].join("\n");
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+  ];
+
+  return lines.join("\n");
 }
 
 app.get("/", (req, res) => {
@@ -97,7 +96,7 @@ app.post("/api/experiment", (req, res) => {
     fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
 
     console.log("Bestand opgeslagen:", fileName);
-    console.log("Aantal logs:", Array.isArray(payload.logs) ? payload.logs.length : 0);
+    console.log("Aantal logs:", payload.logs.length);
 
     return res.status(200).json({
       ok: true,
@@ -115,9 +114,10 @@ app.post("/api/experiment", (req, res) => {
 
 app.get("/api/download-all", (req, res) => {
   try {
-    const allData = loadAllJsonFiles().map((entry) => ({
-      file: entry.file,
-      ...entry.parsed,
+    const files = getJsonFiles();
+    const allData = files.map((file) => ({
+      file,
+      ...readJsonFile(file),
     }));
 
     return res.status(200).json({
@@ -136,12 +136,13 @@ app.get("/api/download-all", (req, res) => {
 
 app.get("/api/download-csv", (req, res) => {
   try {
-    const allEntries = loadAllJsonFiles();
+    const files = getJsonFiles();
     const rows = [];
 
-    allEntries.forEach(({ file, parsed }) => {
-      const meta = parsed.meta || {};
-      const logs = Array.isArray(parsed.logs) ? parsed.logs : [];
+    files.forEach((file) => {
+      const session = readJsonFile(file);
+      const meta = session.meta || {};
+      const logs = Array.isArray(session.logs) ? session.logs : [];
 
       logs.forEach((log) => {
         rows.push({
@@ -151,6 +152,7 @@ app.get("/api/download-csv", (req, res) => {
           condition_label: meta.condition_label || "",
           hedging: meta.hedging ?? "",
           modality: meta.modality ?? "",
+          participant_blinded_to_condition_meaning: meta.participant_blinded_to_condition_meaning ?? "",
           session_status: meta.session_status || "",
           session_start: meta.session_start || "",
           session_end: meta.session_end || "",
@@ -159,12 +161,14 @@ app.get("/api/download-csv", (req, res) => {
           trust_score_mean: meta.trust_score_mean ?? "",
           nasa_tlx_raw_mean: meta.nasa_tlx_raw_mean ?? "",
           interview_consent: meta.interview_consent || "",
+          offer_interview: meta.offer_interview ?? "",
+          assignment_mode: meta.assignment_mode || "",
           ...log,
         });
       });
     });
 
-    const csv = toCsv(rows);
+    const csv = rowsToCsv(rows);
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=ai_hedging_data.csv");
