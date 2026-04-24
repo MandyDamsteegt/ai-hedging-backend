@@ -302,24 +302,3 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-app.get("/api/clear-data", (req, res) => {
-  try {
-    const files = fs.readdirSync(DATA_DIR);
-
-    files.forEach((file) => {
-      fs.unlinkSync(path.join(DATA_DIR, file));
-    });
-
-    res.json({
-      ok: true,
-      message: "All data cleared",
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      ok: false,
-      message: "Failed to clear data",
-    });
-  }
-});
