@@ -53,14 +53,12 @@ function rowsToCsv(rows) {
     }, new Set())
   );
 
-  const lines = [
+  return [
     headers.join(","),
     ...rows.map((row) =>
       headers.map((header) => csvEscape(row[header])).join(",")
     ),
-  ];
-
-  return lines.join("\n");
+  ].join("\n");
 }
 
 app.get("/", (req, res) => {
@@ -223,8 +221,10 @@ app.get("/api/download-participants-csv", (req, res) => {
       const meanDecisionTime =
         completedLogs > 0
           ? Math.round(
-              logs.reduce((sum, r) => sum + Number(r.decision_time_ms || 0), 0) /
-                completedLogs
+              logs.reduce(
+                (sum, r) => sum + Number(r.decision_time_ms || 0),
+                0
+              ) / completedLogs
             )
           : "";
 
@@ -292,6 +292,32 @@ app.get("/api/download-participants-csv", (req, res) => {
   }
 });
 
+// Tijdelijk gebruiken om testdata te verwijderen.
+// Verwijder deze route direct na het legen van de testdata.
+app.get("/api/clear-data", (req, res) => {
+  try {
+    const files = getJsonFiles();
+
+    files.forEach((file) => {
+      fs.unlinkSync(path.join(DATA_DIR, file));
+    });
+
+    console.log("All data cleared");
+
+    return res.status(200).json({
+      ok: true,
+      message: "All data deleted",
+      deleted_files: files.length,
+    });
+  } catch (error) {
+    console.error("Clear data error:", error);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to delete data.",
+    });
+  }
+});
+
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
@@ -301,28 +327,4 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-});
-
-app.delete("/api/clear-data", (req, res) => {
-  try {
-    const files = fs.readdirSync(DATA_DIR);
-
-    files.forEach((file) => {
-      const filePath = path.join(DATA_DIR, file);
-      fs.unlinkSync(filePath);
-    });
-
-    console.log("All data cleared");
-
-    res.json({
-      ok: true,
-      message: "All data deleted",
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      ok: false,
-      message: "Failed to delete data",
-    });
-  }
 });
