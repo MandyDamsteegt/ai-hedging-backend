@@ -302,3 +302,27 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+app.delete("/api/clear-data", (req, res) => {
+  try {
+    const files = fs.readdirSync(DATA_DIR);
+
+    files.forEach((file) => {
+      const filePath = path.join(DATA_DIR, file);
+      fs.unlinkSync(filePath);
+    });
+
+    console.log("All data cleared");
+
+    res.json({
+      ok: true,
+      message: "All data deleted",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ok: false,
+      message: "Failed to delete data",
+    });
+  }
+});
