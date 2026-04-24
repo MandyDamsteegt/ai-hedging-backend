@@ -81,7 +81,6 @@ app.post("/api/experiment", (req, res) => {
     console.log("Participant:", payload?.meta?.participant_id || "unknown");
 
     if (!payload || !payload.meta || !Array.isArray(payload.logs)) {
-      console.log("Ongeldige payload ontvangen");
       return res.status(400).json({
         ok: false,
         message: "Invalid payload structure.",
@@ -95,8 +94,7 @@ app.post("/api/experiment", (req, res) => {
 
     fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
 
-    console.log("Bestand opgeslagen:", fileName);
-    console.log("Aantal logs:", payload.logs.length);
+    console.log("Saved:", fileName);
 
     return res.status(200).json({
       ok: true,
@@ -147,39 +145,18 @@ app.get("/api/download-csv", (req, res) => {
       logs.forEach((log) => {
         rows.push({
           source_file: file,
-
           participant_id: meta.participant_id || "",
           condition: meta.condition || "",
           condition_label: meta.condition_label || "",
           hedging: meta.hedging ?? "",
           modality: meta.modality ?? "",
-          participant_blinded_to_condition_meaning:
-            meta.participant_blinded_to_condition_meaning ?? "",
-          assignment_mode: meta.assignment_mode || "",
-          offer_interview: meta.offer_interview ?? "",
-
-          session_status: meta.session_status || "",
-          session_start: meta.session_start || "",
-          session_end: meta.session_end || "",
-          n_trials_completed: meta.n_trials_completed ?? "",
-          main_trials_planned: meta.main_trials_planned ?? "",
-          practice_trials_completed: meta.practice_trials_completed ?? "",
-
-          manipulation_uncertainty: meta.manipulation_uncertainty || "",
-          manipulation_certainty: meta.manipulation_certainty || "",
-
           trust_score_mean: meta.trust_score_mean ?? "",
           nasa_tlx_raw_mean: meta.nasa_tlx_raw_mean ?? "",
-          ueq_scale_scores: meta.ueq_scale_scores
-            ? JSON.stringify(meta.ueq_scale_scores)
-            : "",
-
           interview_consent: meta.interview_consent || "",
           interview_strategy: meta.interview_strategy || "",
           interview_hedges: meta.interview_hedges || "",
           interview_modality: meta.interview_modality || "",
           interview_block_changes: meta.interview_block_changes || "",
-
           ...log,
         });
       });
@@ -195,7 +172,7 @@ app.get("/api/download-csv", (req, res) => {
 
     return res.status(200).send(csv);
   } catch (error) {
-    console.error("Download-csv error:", error);
+    console.error("CSV error:", error);
     return res.status(500).json({
       ok: false,
       message: "Failed to generate CSV.",
@@ -212,65 +189,23 @@ app.get("/api/download-participants-csv", (req, res) => {
       const meta = session.meta || {};
       const logs = Array.isArray(session.logs) ? session.logs : [];
 
-      const completedLogs = logs.length;
+      const completed = logs.length;
       const accepted = logs.filter((r) => r.final_decision === 1).length;
-      const rejected = logs.filter((r) => r.final_decision === 0).length;
       const verified = logs.filter((r) => r.verify_clicked === 1).length;
       const correct = logs.filter((r) => r.final_accuracy === 1).length;
 
-      const meanDecisionTime =
-        completedLogs > 0
-          ? Math.round(
-              logs.reduce(
-                (sum, r) => sum + Number(r.decision_time_ms || 0),
-                0
-              ) / completedLogs
-            )
-          : "";
-
       return {
-        source_file: file,
-
         participant_id: meta.participant_id || "",
         condition: meta.condition || "",
         condition_label: meta.condition_label || "",
         hedging: meta.hedging ?? "",
         modality: meta.modality ?? "",
-        participant_blinded_to_condition_meaning:
-          meta.participant_blinded_to_condition_meaning ?? "",
-        assignment_mode: meta.assignment_mode || "",
-        offer_interview: meta.offer_interview ?? "",
-
-        session_status: meta.session_status || "",
-        session_start: meta.session_start || "",
-        session_end: meta.session_end || "",
-        n_trials_completed: meta.n_trials_completed ?? completedLogs,
-        main_trials_planned: meta.main_trials_planned ?? "",
-        practice_trials_completed: meta.practice_trials_completed ?? "",
-
-        accepted,
-        rejected,
-        verified,
-        correct,
-        accept_rate: completedLogs ? accepted / completedLogs : "",
-        verify_rate: completedLogs ? verified / completedLogs : "",
-        accuracy_rate: completedLogs ? correct / completedLogs : "",
-        mean_decision_time_ms: meanDecisionTime,
-
-        manipulation_uncertainty: meta.manipulation_uncertainty || "",
-        manipulation_certainty: meta.manipulation_certainty || "",
-
+        accept_rate: completed ? accepted / completed : "",
+        verify_rate: completed ? verified / completed : "",
+        accuracy_rate: completed ? correct / completed : "",
         trust_score_mean: meta.trust_score_mean ?? "",
         nasa_tlx_raw_mean: meta.nasa_tlx_raw_mean ?? "",
-        ueq_scale_scores: meta.ueq_scale_scores
-          ? JSON.stringify(meta.ueq_scale_scores)
-          : "",
-
         interview_consent: meta.interview_consent || "",
-        interview_strategy: meta.interview_strategy || "",
-        interview_hedges: meta.interview_hedges || "",
-        interview_modality: meta.interview_modality || "",
-        interview_block_changes: meta.interview_block_changes || "",
       };
     });
 
@@ -284,36 +219,10 @@ app.get("/api/download-participants-csv", (req, res) => {
 
     return res.status(200).send(csv);
   } catch (error) {
-    console.error("Download-participants-csv error:", error);
+    console.error("Participant CSV error:", error);
     return res.status(500).json({
       ok: false,
       message: "Failed to generate participant CSV.",
-    });
-  }
-});
-
-// Tijdelijk gebruiken om testdata te verwijderen.
-// Verwijder deze route direct na het legen van de testdata.
-app.get("/api/clear-data", (req, res) => {
-  try {
-    const files = getJsonFiles();
-
-    files.forEach((file) => {
-      fs.unlinkSync(path.join(DATA_DIR, file));
-    });
-
-    console.log("All data cleared");
-
-    return res.status(200).json({
-      ok: true,
-      message: "All data deleted",
-      deleted_files: files.length,
-    });
-  } catch (error) {
-    console.error("Clear data error:", error);
-    return res.status(500).json({
-      ok: false,
-      message: "Failed to delete data.",
     });
   }
 });
