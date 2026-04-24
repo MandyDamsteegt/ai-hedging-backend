@@ -55,7 +55,9 @@ function rowsToCsv(rows) {
 
   const lines = [
     headers.join(","),
-    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+    ...rows.map((row) =>
+      headers.map((header) => csvEscape(row[header])).join(",")
+    ),
   ];
 
   return lines.join("\n");
@@ -147,22 +149,39 @@ app.get("/api/download-csv", (req, res) => {
       logs.forEach((log) => {
         rows.push({
           source_file: file,
+
           participant_id: meta.participant_id || "",
           condition: meta.condition || "",
           condition_label: meta.condition_label || "",
           hedging: meta.hedging ?? "",
           modality: meta.modality ?? "",
-          participant_blinded_to_condition_meaning: meta.participant_blinded_to_condition_meaning ?? "",
+          participant_blinded_to_condition_meaning:
+            meta.participant_blinded_to_condition_meaning ?? "",
+          assignment_mode: meta.assignment_mode || "",
+          offer_interview: meta.offer_interview ?? "",
+
           session_status: meta.session_status || "",
           session_start: meta.session_start || "",
           session_end: meta.session_end || "",
+          n_trials_completed: meta.n_trials_completed ?? "",
+          main_trials_planned: meta.main_trials_planned ?? "",
+          practice_trials_completed: meta.practice_trials_completed ?? "",
+
           manipulation_uncertainty: meta.manipulation_uncertainty || "",
           manipulation_certainty: meta.manipulation_certainty || "",
+
           trust_score_mean: meta.trust_score_mean ?? "",
           nasa_tlx_raw_mean: meta.nasa_tlx_raw_mean ?? "",
+          ueq_scale_scores: meta.ueq_scale_scores
+            ? JSON.stringify(meta.ueq_scale_scores)
+            : "",
+
           interview_consent: meta.interview_consent || "",
-          offer_interview: meta.offer_interview ?? "",
-          assignment_mode: meta.assignment_mode || "",
+          interview_strategy: meta.interview_strategy || "",
+          interview_hedges: meta.interview_hedges || "",
+          interview_modality: meta.interview_modality || "",
+          interview_block_changes: meta.interview_block_changes || "",
+
           ...log,
         });
       });
@@ -171,13 +190,104 @@ app.get("/api/download-csv", (req, res) => {
     const csv = rowsToCsv(rows);
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=ai_hedging_data.csv");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=ai_hedging_trial_data.csv"
+    );
+
     return res.status(200).send(csv);
   } catch (error) {
     console.error("Download-csv error:", error);
     return res.status(500).json({
       ok: false,
       message: "Failed to generate CSV.",
+    });
+  }
+});
+
+app.get("/api/download-participants-csv", (req, res) => {
+  try {
+    const files = getJsonFiles();
+
+    const rows = files.map((file) => {
+      const session = readJsonFile(file);
+      const meta = session.meta || {};
+      const logs = Array.isArray(session.logs) ? session.logs : [];
+
+      const completedLogs = logs.length;
+      const accepted = logs.filter((r) => r.final_decision === 1).length;
+      const rejected = logs.filter((r) => r.final_decision === 0).length;
+      const verified = logs.filter((r) => r.verify_clicked === 1).length;
+      const correct = logs.filter((r) => r.final_accuracy === 1).length;
+
+      const meanDecisionTime =
+        completedLogs > 0
+          ? Math.round(
+              logs.reduce((sum, r) => sum + Number(r.decision_time_ms || 0), 0) /
+                completedLogs
+            )
+          : "";
+
+      return {
+        source_file: file,
+
+        participant_id: meta.participant_id || "",
+        condition: meta.condition || "",
+        condition_label: meta.condition_label || "",
+        hedging: meta.hedging ?? "",
+        modality: meta.modality ?? "",
+        participant_blinded_to_condition_meaning:
+          meta.participant_blinded_to_condition_meaning ?? "",
+        assignment_mode: meta.assignment_mode || "",
+        offer_interview: meta.offer_interview ?? "",
+
+        session_status: meta.session_status || "",
+        session_start: meta.session_start || "",
+        session_end: meta.session_end || "",
+        n_trials_completed: meta.n_trials_completed ?? completedLogs,
+        main_trials_planned: meta.main_trials_planned ?? "",
+        practice_trials_completed: meta.practice_trials_completed ?? "",
+
+        accepted,
+        rejected,
+        verified,
+        correct,
+        accept_rate: completedLogs ? accepted / completedLogs : "",
+        verify_rate: completedLogs ? verified / completedLogs : "",
+        accuracy_rate: completedLogs ? correct / completedLogs : "",
+        mean_decision_time_ms: meanDecisionTime,
+
+        manipulation_uncertainty: meta.manipulation_uncertainty || "",
+        manipulation_certainty: meta.manipulation_certainty || "",
+
+        trust_score_mean: meta.trust_score_mean ?? "",
+        nasa_tlx_raw_mean: meta.nasa_tlx_raw_mean ?? "",
+        ueq_scale_scores: meta.ueq_scale_scores
+          ? JSON.stringify(meta.ueq_scale_scores)
+          : "",
+
+        interview_consent: meta.interview_consent || "",
+        interview_strategy: meta.interview_strategy || "",
+        interview_hedges: meta.interview_hedges || "",
+        interview_modality: meta.interview_modality || "",
+        interview_block_changes: meta.interview_block_changes || "",
+      };
+    });
+
+    const csv = rowsToCsv(rows);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=ai_hedging_participant_data.csv"
+    );
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error("Download-participants-csv error:", error);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to generate participant CSV.",
     });
   }
 });
