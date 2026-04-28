@@ -230,6 +230,32 @@ app.get("/api/download-interviews-csv", (req, res) => {
   res.send(csv);
 });
 
+/* -------------------- verwijderen -------------------- */
+app.delete("/api/clear-data", (req, res) => {
+  try {
+    const files = getJsonFiles();
+
+    files.forEach((file) => {
+      const filePath = path.join(DATA_DIR, file);
+      fs.unlinkSync(filePath);
+    });
+
+    console.log(`Deleted ${files.length} files`);
+
+    return res.status(200).json({
+      ok: true,
+      message: `Deleted ${files.length} files`,
+    });
+  } catch (error) {
+    console.error("Clear data error:", error);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to clear data",
+    });
+  }
+});
+/* -------------------- verwijderen data -------------------- */
+
 /* -------------------- 404 -------------------- */
 
 app.use((req, res) => {
