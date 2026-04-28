@@ -231,7 +231,10 @@ app.get("/api/download-interviews-csv", (req, res) => {
 });
 
 /* -------------------- verwijderen -------------------- */
-app.delete("/api/clear-data", (req, res) => {
+
+/* -------------------- verwijderen data -------------------- */
+
+app.get("/api/clear-data", (req, res) => {
   try {
     const files = getJsonFiles();
 
@@ -254,7 +257,8 @@ app.delete("/api/clear-data", (req, res) => {
     });
   }
 });
-/* -------------------- verwijderen data -------------------- */
+
+
 
 /* -------------------- 404 -------------------- */
 
