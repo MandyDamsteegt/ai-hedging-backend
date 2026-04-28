@@ -229,8 +229,40 @@ app.get("/api/download-interviews-csv", (req, res) => {
   );
   res.send(csv);
 });
+/* -------------------- test data verwijderen -------------------- */
+app.get("/api/clear-data", (req, res) => {
+  const ADMIN_CODE = "8fH29_kLmP_44ZxQp_9201_TEST_ADMIN";
 
+  if (req.query.code !== ADMIN_CODE) {
+    return res.status(403).json({
+      ok: false,
+      message: "Unauthorized",
+    });
+  }
 
+  try {
+    const files = getJsonFiles();
+
+    files.forEach((file) => {
+      const filePath = path.join(DATA_DIR, file);
+      fs.unlinkSync(filePath);
+    });
+
+    console.log(`Deleted ${files.length} files`);
+
+    return res.status(200).json({
+      ok: true,
+      message: `Deleted ${files.length} files`,
+    });
+  } catch (error) {
+    console.error("Clear data error:", error);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to clear data",
+    });
+  }
+});
+/* -------------------- test data verwijderen -------------------- */
 /* -------------------- 404 -------------------- */
 
 app.use((req, res) => {
