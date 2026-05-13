@@ -11,12 +11,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.DATA_DIR || "/data";
 
 if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR);
+  fs.mkdirSync(DATA_DIR, { recursive: true });
   console.log("Created data directory:", DATA_DIR);
 }
+
+console.log("Using data directory:", DATA_DIR);
 
 function safeParticipantId(value) {
   return String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -76,6 +78,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     timestamp: new Date().toISOString(),
+    data_dir: DATA_DIR,
     json_files: getJsonFiles().length,
   });
 });
@@ -121,6 +124,8 @@ app.post("/api/experiment", (req, res) => {
 app.get("/api/files", (req, res) => {
   res.json({
     ok: true,
+    data_dir: DATA_DIR,
+    count: getJsonFiles().length,
     files: getJsonFiles(),
   });
 });
@@ -229,40 +234,7 @@ app.get("/api/download-interviews-csv", (req, res) => {
   );
   res.send(csv);
 });
-/* -------------------- test data verwijderen -------------------- */
-app.get("/api/clear-data", (req, res) => {
-  const ADMIN_CODE = "8fH29_kLmP_44ZxQp_9201_TEST_ADMIN";
 
-  if (req.query.code !== ADMIN_CODE) {
-    return res.status(403).json({
-      ok: false,
-      message: "Unauthorized",
-    });
-  }
-
-  try {
-    const files = getJsonFiles();
-
-    files.forEach((file) => {
-      const filePath = path.join(DATA_DIR, file);
-      fs.unlinkSync(filePath);
-    });
-
-    console.log(`Deleted ${files.length} files`);
-
-    return res.status(200).json({
-      ok: true,
-      message: `Deleted ${files.length} files`,
-    });
-  } catch (error) {
-    console.error("Clear data error:", error);
-    return res.status(500).json({
-      ok: false,
-      message: "Failed to clear data",
-    });
-  }
-});
-/* -------------------- test data verwijderen -------------------- */
 /* -------------------- 404 -------------------- */
 
 app.use((req, res) => {
